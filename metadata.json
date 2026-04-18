@@ -1,0 +1,5 @@
+{
+  "name": "Smart Expense Tracker",
+  "description": "A fintech-style expense tracker with Firebase Auth, Firestore, and analytics.",
+  "requestFramePermissions": []
+}

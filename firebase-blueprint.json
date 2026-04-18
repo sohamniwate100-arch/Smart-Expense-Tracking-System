@@ -1,0 +1,109 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Information about the user",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "profession": { "type": "string", "enum": ["Job", "Student", "Business Owner", "Freelancer"] },
+        "jobType": { "type": "string", "enum": ["Part-time", "Full-time", "Weekend"] },
+        "studentLevel": { "type": "string", "enum": ["School going", "HSC", "Polytechnic", "Graduation", "Post Graduation"] },
+        "businessType": { "type": "string", "enum": ["Online Business", "Offline Business"] },
+        "businessDescription": { "type": "string" },
+        "businessCategory": { "type": "string", "enum": ["B2B", "B2C", "C2C", "C2B"] },
+        "income": { "type": "number" },
+        "currency": { "type": "string" },
+        "age": { "type": "number" },
+        "dailySpendingGoal": { "type": "number" },
+        "monthlySpendingGoal": { "type": "number" },
+        "hasDebt": { "type": "boolean" },
+        "debtAmount": { "type": "number" },
+        "financialGoal": { "type": "string" },
+        "onboardingCompleted": { "type": "boolean" },
+        "budgets": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "displayName", "createdAt"]
+    },
+    "Expense": {
+      "title": "Expense Entry",
+      "description": "A single expense record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "amount": { "type": "number" },
+        "currency": { "type": "string" },
+        "category": { "type": "string" },
+        "notes": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "paymentMethod": { "type": "string", "enum": ["Online", "Cash"] },
+        "isRecurring": { "type": "boolean" },
+        "recurringId": { "type": "string" },
+        "isTaxDeductible": { "type": "boolean" },
+        "receiptUrl": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "amount", "currency", "category", "date", "paymentMethod", "createdAt"]
+    },
+    "RecurringExpense": {
+      "title": "Recurring Expense Template",
+      "description": "Template for automatically generating expenses",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "amount": { "type": "number" },
+        "currency": { "type": "string" },
+        "category": { "type": "string" },
+        "notes": { "type": "string" },
+        "frequency": { "type": "string", "enum": ["Daily", "Weekly", "Monthly"] },
+        "startDate": { "type": "string", "format": "date-time" },
+        "nextDueDate": { "type": "string", "format": "date-time" },
+        "lastProcessedDate": { "type": "string", "format": "date-time" },
+        "active": { "type": "boolean" },
+        "paymentMethod": { "type": "string", "enum": ["Online", "Cash"] },
+        "isTaxDeductible": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "amount", "currency", "category", "frequency", "startDate", "nextDueDate", "active", "paymentMethod", "createdAt"]
+    },
+    "FinancialGoal": {
+      "title": "Financial Goal",
+      "description": "A target for savings or debt reduction",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "targetAmount": { "type": "number" },
+        "currentAmount": { "type": "number" },
+        "deadline": { "type": "string", "format": "date-time" },
+        "category": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "title", "targetAmount", "currentAmount", "deadline", "category", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile documents"
+    },
+    "/expenses/{expenseId}": {
+      "schema": "Expense",
+      "description": "Expense documents"
+    },
+    "/recurring_expenses/{recurringId}": {
+      "schema": "RecurringExpense",
+      "description": "Recurring expense templates"
+    },
+    "/financial_goals/{goalId}": {
+      "schema": "FinancialGoal",
+      "description": "Financial goal documents"
+    }
+  }
+}

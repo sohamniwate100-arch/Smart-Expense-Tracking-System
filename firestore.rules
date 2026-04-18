@@ -1,0 +1,212 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: userId (Firebase Auth UID)
+    // Fields:
+    //   - uid: string (required) - The unique identifier for the user
+    //   - email: string (required) - The user's email address
+    //   - displayName: string (required) - The user's display name
+    //   - createdAt: timestamp (required) - When the user account was created
+    //
+    // Collection: expenses
+    // Document ID: auto-generated
+    // Fields:
+    //   - userId: string (required) - The ID of the user who owns this expense
+    //   - amount: number (required) - The amount spent
+    //   - currency: string (required) - The currency of the expense
+    //   - category: string (required) - The category of the expense
+    //   - date: timestamp (required) - When the expense occurred
+    //   - notes: string (optional) - Optional note about the expense
+    //   - isTaxDeductible: bool (optional) - If the expense is tax deductible
+    //   - receiptUrl: string (optional) - URL to the receipt image
+    //   - createdAt: timestamp (required) - When the record was created
+    //
+    // Collection: financial_goals
+    // Document ID: auto-generated
+    // Fields:
+    //   - userId: string (required) - The ID of the user who owns this goal
+    //   - title: string (required) - The title of the goal
+    //   - targetAmount: number (required) - The target amount
+    //   - currentAmount: number (required) - The current amount saved
+    //   - deadline: timestamp (required) - The deadline for the goal
+    //   - category: string (required) - The category of the goal
+    //   - createdAt: timestamp (required) - When the record was created
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.userId;
+    }
+
+    function isUserDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.uid;
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        ((exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+          'role' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data && 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
+          (request.auth.token.email == "sohamniwate90@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isValidUser(data) {
+      let allowedFields = [
+        'uid', 'email', 'displayName', 'createdAt', 'profession', 
+        'jobType', 'studentLevel', 'businessType', 'businessDescription', 'businessCategory',
+        'income', 'currency', 'age', 'dailySpendingGoal', 'monthlySpendingGoal', 
+        'hasDebt', 'debtAmount', 'financialGoal', 'onboardingCompleted', 'role', 'budgets'
+      ];
+      return hasRequiredFields(['uid', 'email', 'displayName', 'createdAt']) &&
+             hasOnlyAllowedFields(allowedFields) &&
+             data.uid == request.auth.uid &&
+             data.email is string && isValidEmail(data.email) &&
+             data.displayName is string && data.displayName.size() > 0 && data.displayName.size() < 100 &&
+             (data.createdAt is timestamp || data.createdAt is string) &&
+             (!('profession' in data) || data.profession in ['Job', 'Student', 'Business Owner', 'Freelancer']) &&
+             (!('jobType' in data) || (data.jobType is string && data.jobType.size() < 50)) &&
+             (!('studentLevel' in data) || (data.studentLevel is string && data.studentLevel.size() < 50)) &&
+             (!('businessType' in data) || (data.businessType is string && data.businessType.size() < 50)) &&
+             (!('businessDescription' in data) || (data.businessDescription is string && data.businessDescription.size() < 1000)) &&
+             (!('businessCategory' in data) || (data.businessCategory is string && data.businessCategory.size() < 10)) &&
+             (!('income' in data) || data.income is number) &&
+             (!('currency' in data) || data.currency is string) &&
+             (!('age' in data) || data.age is number) &&
+             (!('dailySpendingGoal' in data) || data.dailySpendingGoal is number) &&
+             (!('monthlySpendingGoal' in data) || data.monthlySpendingGoal is number) &&
+             (!('hasDebt' in data) || data.hasDebt is bool) &&
+             (!('debtAmount' in data) || data.debtAmount is number) &&
+             (!('financialGoal' in data) || data.financialGoal is string) &&
+             (!('onboardingCompleted' in data) || data.onboardingCompleted is bool) &&
+             (!('role' in data) || data.role in ['admin', 'user']) &&
+             (!('budgets' in data) || data.budgets is map);
+    }
+
+    function isValidExpense(data) {
+      return hasRequiredFields(['userId', 'amount', 'currency', 'category', 'date', 'paymentMethod', 'createdAt']) &&
+             hasOnlyAllowedFields(['userId', 'amount', 'currency', 'category', 'date', 'notes', 'paymentMethod', 'createdAt', 'isRecurring', 'recurringId', 'isTaxDeductible', 'receiptUrl']) &&
+             data.userId == request.auth.uid &&
+             data.amount is number && data.amount >= 0 &&
+             data.currency is string &&
+             data.category is string && data.category.size() > 0 && data.category.size() < 50 &&
+             data.date is timestamp &&
+             data.paymentMethod in ['Online', 'Cash'] &&
+             data.createdAt is timestamp &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() < 500)) &&
+             (!('isRecurring' in data) || data.isRecurring is bool) &&
+             (!('recurringId' in data) || (data.recurringId is string && data.recurringId.size() < 100)) &&
+             (!('isTaxDeductible' in data) || data.isTaxDeductible is bool) &&
+             (!('receiptUrl' in data) || (data.receiptUrl is string && data.receiptUrl.size() < 1000));
+    }
+
+    function isValidRecurringExpense(data) {
+      return hasRequiredFields(['userId', 'amount', 'currency', 'category', 'frequency', 'startDate', 'nextDueDate', 'active', 'paymentMethod', 'createdAt']) &&
+             hasOnlyAllowedFields(['userId', 'amount', 'currency', 'category', 'notes', 'frequency', 'startDate', 'nextDueDate', 'lastProcessedDate', 'active', 'paymentMethod', 'isTaxDeductible', 'createdAt']) &&
+             data.userId == request.auth.uid &&
+             data.amount is number && data.amount >= 0 &&
+             data.currency is string &&
+             data.category is string && data.category.size() > 0 && data.category.size() < 50 &&
+             data.frequency in ['Daily', 'Weekly', 'Monthly'] &&
+             data.startDate is timestamp &&
+             data.nextDueDate is timestamp &&
+             data.active is bool &&
+             data.paymentMethod in ['Online', 'Cash'] &&
+             data.createdAt is timestamp &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() < 500)) &&
+             (!('lastProcessedDate' in data) || data.lastProcessedDate is timestamp) &&
+             (!('isTaxDeductible' in data) || data.isTaxDeductible is bool);
+    }
+
+    function isValidFinancialGoal(data) {
+      return hasRequiredFields(['userId', 'title', 'targetAmount', 'currentAmount', 'deadline', 'category', 'createdAt']) &&
+             hasOnlyAllowedFields(['userId', 'title', 'targetAmount', 'currentAmount', 'deadline', 'category', 'createdAt']) &&
+             data.userId == request.auth.uid &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 100 &&
+             data.targetAmount is number && data.targetAmount >= 0 &&
+             data.currentAmount is number && data.currentAmount >= 0 &&
+             data.deadline is timestamp &&
+             data.category is string &&
+             data.createdAt is timestamp;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && isValidUser(request.resource.data) && 
+                      (!('role' in request.resource.data) || request.resource.data.role == 'user' || isAdmin());
+      allow update: if (isOwner(userId) && isValidUser(request.resource.data) && 
+                      request.resource.data.uid == resource.data.uid &&
+                      (!('createdAt' in resource.data) || request.resource.data.createdAt == resource.data.createdAt) &&
+                      (!('role' in resource.data) || request.resource.data.role == resource.data.role || isAdmin())) || isAdmin();
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+
+    match /expenses/{expenseId} {
+      allow read: if isDocOwner();
+      allow create: if isAuthenticated() && isValidExpense(request.resource.data);
+      allow update: if isDocOwner() && isValidExpense(request.resource.data) &&
+                      request.resource.data.userId == resource.data.userId &&
+                      request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if isDocOwner();
+    }
+
+    match /recurring_expenses/{recurringId} {
+      allow read: if isDocOwner();
+      allow create: if isAuthenticated() && isValidRecurringExpense(request.resource.data);
+      allow update: if isDocOwner() && isValidRecurringExpense(request.resource.data) &&
+                      request.resource.data.userId == resource.data.userId &&
+                      request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if isDocOwner();
+    }
+
+    match /financial_goals/{goalId} {
+      allow read: if isDocOwner();
+      allow create: if isAuthenticated() && isValidFinancialGoal(request.resource.data);
+      allow update: if isDocOwner() && isValidFinancialGoal(request.resource.data) &&
+                      request.resource.data.userId == resource.data.userId &&
+                      request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if isDocOwner();
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
